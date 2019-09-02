@@ -20,10 +20,46 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	//"math"
+	"net/http"
+	"strconv"
+	//"time"
 )
 
 func main() {
 	log.Println("Starting Statum-Server v0.0.1")
+
+	//addr := "localhost:8765"
+	//server := &osc.Server{Addr: addr}
+
+	log.Println("Creating /dat endpoint'")
+	http.HandleFunc("/dat", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "OK")
+
+		log.Println("DAT!");
+
+		ax, err := strconv.ParseFloat(r.URL.Query()["ax"][0], 32)
+		if err != nil {
+			log.Println("Missing ax variable");
+		}
+
+		log.Println("DAT: %f", ax/100.0)
+
+
+
+		// if err != nil {
+		// 	log.Fatal("Unable to parse '/l' argument.")
+		// }
+
+		// id := lerp(0, 100, f, 1, 100)
+		// client := osc.NewClient("localhost", 53000)
+		// msg := osc.NewMessage(fmt.Sprintf("/cue/l%d/start", id))
+		// client.Send(msg)
+		// log.Println(fmt.Sprintf("%s (%.2f)", msg.Address, f))
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
