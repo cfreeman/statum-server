@@ -21,12 +21,35 @@ package main
 
 import (
 	"fmt"
+	"github.com/hypebeast/go-osc/osc"
 	"log"
-	//"math"
+	"math"
 	"net/http"
 	"strconv"
 	//"time"
 )
+
+func lerp(srcMin float64, srcMax float64, val float64, dstMin int, dstMax int) int {
+
+	ratio := (math.Min(srcMax, math.Max(srcMin, val)) - srcMin) / (srcMax - srcMin)
+
+	return int(ratio*float64(dstMax-dstMin)) + dstMin
+}
+
+func pipeToOSC(r *http.Request, dimension string) {
+	sensorID := r.URL.Query()["id"][0]
+
+	am, err := strconv.ParseFloat(r.URL.Query()[dimension+"m"][0], 32)
+	if err != nil {
+		log.Println("Missing " + dimension + "m variable")
+	}
+	val := lerp(0, 100, am/100.0, 1, 100)
+	client := osc.NewClient("localhost", 53000)
+	msg := osc.NewMessage(fmt.Sprintf("/cue/%s%s%d/start", dimension, sensorID, val))
+	client.Send(msg)
+
+	log.Println(fmt.Sprintf("%s(%.2f)->/cue/%s%s%d/start", sensorID, am/100.0, dimension, sensorID, val))
+}
 
 func main() {
 	log.Println("Starting Statum-Server v0.0.1")
@@ -38,28 +61,28 @@ func main() {
 	http.HandleFunc("/dat", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "OK")
 
-		log.Println("DAT!");
+		pipeToOSC(r, "a")
+		pipeToOSC(r, "r")
 
-		ax, err := strconv.ParseFloat(r.URL.Query()["ax"][0], 32)
-		if err != nil {
-			log.Println("Missing ax variable");
-		}
+		// sensorID := r.URL.Query()["id"][0]
 
-		log.Println("DAT: %f", ax/100.0)
-
-
-
+		// am, err := strconv.ParseFloat(r.URL.Query()["am"][0], 32)
 		// if err != nil {
-		// 	log.Fatal("Unable to parse '/l' argument.")
+		// 	log.Println("Missing am variable");
+		// }
+		// val := lerp(0, 100, am/100.0, 1, 100)
+		// client := osc.NewClient("localhost", 53000)
+		// msg := osc.NewMessage(fmt.Sprintf("/cue/a%s%d/start", sensorID, val))
+		// client.Send(msg)
+
+		// log.Println(fmt.Sprintf("ACCEL: %s (%.2fg) - /cue/a%s%d/start", sensorID, am/100.0, sensorID, val))
+
+		// rm, err := strconv.ParseFloat(r.URL.Query()["rm"][0], 32)
+		// if err != nil {
+		// 	log.Println("Missing rm variable");
 		// }
 
-		// id := lerp(0, 100, f, 1, 100)
-		// client := osc.NewClient("localhost", 53000)
-		// msg := osc.NewMessage(fmt.Sprintf("/cue/l%d/start", id))
-		// client.Send(msg)
-		// log.Println(fmt.Sprintf("%s (%.2f)", msg.Address, f))
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
-
