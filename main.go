@@ -26,7 +26,6 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	//"time"
 )
 
 func lerp(srcMin float64, srcMax float64, val float64, dstMin int, dstMax int) int {
@@ -63,25 +62,23 @@ func main() {
 
 		pipeToOSC(r, "a")
 		pipeToOSC(r, "r")
+	})
 
-		// sensorID := r.URL.Query()["id"][0]
+	log.Println("Creating /step endpoint")
+	http.HandleFunc("/step", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "OK")
 
-		// am, err := strconv.ParseFloat(r.URL.Query()["am"][0], 32)
-		// if err != nil {
-		// 	log.Println("Missing am variable");
-		// }
-		// val := lerp(0, 100, am/100.0, 1, 100)
-		// client := osc.NewClient("localhost", 53000)
-		// msg := osc.NewMessage(fmt.Sprintf("/cue/a%s%d/start", sensorID, val))
-		// client.Send(msg)
+		sensorID := r.URL.Query()["id"][0]
+		steps, err := strconv.ParseFloat(r.URL.Query()["s"][0], 32)
+		if err != nil {
+			log.Println("Missing s variable")
+		}
 
-		// log.Println(fmt.Sprintf("ACCEL: %s (%.2fg) - /cue/a%s%d/start", sensorID, am/100.0, sensorID, val))
+		client := osc.NewClient("localhost", 53000)
+		msg := osc.NewMessage(fmt.Sprintf("/cue/step%s/start", sensorID))
+		client.Send(msg)
 
-		// rm, err := strconv.ParseFloat(r.URL.Query()["rm"][0], 32)
-		// if err != nil {
-		// 	log.Println("Missing rm variable");
-		// }
-
+		log.Println(fmt.Sprintf("%s(%d)->/cue/step%s/start", sensorID, steps, sensorID))
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
