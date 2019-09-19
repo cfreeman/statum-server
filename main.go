@@ -90,7 +90,7 @@ func main() {
 		}
 
 		client := osc.NewClient("localhost", 53000)
-		msg := osc.NewMessage(fmt.Sprintf("/cue/g%s%d/start", sensorID, int(acc/10.0)))
+		msg := osc.NewMessage(fmt.Sprintf("/cue/g%s%d/start", sensorID, int(acc)))
 		log.Println(msg.Address)
 		client.Send(msg)
 
