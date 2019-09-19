@@ -26,42 +26,82 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
 
-func lerp(srcMin float64, srcMax float64, val float64, dstMin int, dstMax int) int {
+var mutex = &sync.Mutex{}
+var steps map[string]int = map[string]int{"A": 0, "B": 0, "C": 0, "D": 0}
 
+func lerp(srcMin float64, srcMax float64, val float64, dstMin int, dstMax int) int {
 	ratio := (math.Min(srcMax, math.Max(srcMin, val)) - srcMin) / (srcMax - srcMin)
 
 	return int(ratio*float64(dstMax-dstMin)) + dstMin
 }
 
-func pipeToOSC(r *http.Request, dimension string) {
-	sensorID := r.URL.Query()["id"][0]
+func pulse(heartRate chan int, id string) {
+	log.Println("Starting a fully hectic Nissan Pulsar (" + id + ").")
 
-	am, err := strconv.ParseFloat(r.URL.Query()[dimension+"m"][0], 32)
-	if err != nil {
-		log.Println("Missing " + dimension + "m variable")
+	pulseLength := 1000
+	start := time.Now()
+
+	for {
+		select {
+		case hr := <-heartRate:
+			if hr > 0 {
+				pulseLength = 60000 / hr
+			}
+		default:
+		}
+
+		if time.Now().Sub(start) > (time.Duration(pulseLength) * time.Millisecond) {
+			// Broadcast the heartbeat.
+			client := osc.NewClient("localhost", 53000)
+			msg := osc.NewMessage("/cue/p" + id + "/start")
+			log.Println(msg.Address)
+			client.Send(msg)
+
+			start = time.Now()
+		}
+
+		time.Sleep(50 * time.Millisecond) // Don't chew CPU.
 	}
-	val := lerp(0, 100, am/100.0, 1, 100)
-	client := osc.NewClient("localhost", 53000)
-	msg := osc.NewMessage(fmt.Sprintf("/cue/%s%s%d/start", dimension, sensorID, val))
-	client.Send(msg)
-
-	log.Println(fmt.Sprintf("%s(%.2f)->/cue/%s%s%d/start", sensorID, am/100.0, dimension, sensorID, val))
 }
 
 func main() {
-	log.Println("Starting Statum-Server v0.0.1")
+	log.Println("Starting Statum-Server v0.0.2")
 
-	//addr := "localhost:8765"
-	//server := &osc.Server{Addr: addr}
+	heartRateA := make(chan int)
+	go pulse(heartRateA, "A")
+
+	heartRateB := make(chan int)
+	go pulse(heartRateB, "B")
 
 	log.Println("Creating /dat endpoint'")
 	http.HandleFunc("/dat", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "OK")
 
-		pipeToOSC(r, "a")
-		pipeToOSC(r, "r")
+		sensorID := r.URL.Query()["id"][0]
+
+		acc, err := strconv.ParseFloat(r.URL.Query()["am"][0], 32)
+		if err != nil {
+			log.Println("Missing am variable")
+		}
+
+		client := osc.NewClient("localhost", 53000)
+		msg := osc.NewMessage(fmt.Sprintf("/cue/g%s%d/start", sensorID, int(acc/10.0)))
+		log.Println(msg.Address)
+		client.Send(msg)
+
+		rot, err := strconv.ParseFloat(r.URL.Query()["rm"][0], 32)
+		if err != nil {
+			log.Println("Missing rm variable")
+		}
+
+		msg = osc.NewMessage(fmt.Sprintf("/cue/r%s%d/start", sensorID, int(rot)))
+		log.Println(msg.Address)
+		client.Send(msg)
 	})
 
 	log.Println("Creating /step endpoint")
@@ -69,16 +109,42 @@ func main() {
 		fmt.Fprintf(w, "OK")
 
 		sensorID := r.URL.Query()["id"][0]
-		steps, err := strconv.ParseFloat(r.URL.Query()["s"][0], 32)
+		client := osc.NewClient("localhost", 53000)
+
+		mutex.Lock()
+		steps[sensorID] = steps[sensorID] + 1
+		msg := osc.NewMessage(fmt.Sprintf("/cue/s%s%d/start", sensorID, steps[sensorID]))
+		mutex.Unlock()
+
+		log.Println(msg.Address)
+		client.Send(msg)
+
+		msg = osc.NewMessage(fmt.Sprintf("/cue/step%s/start", sensorID))
+		log.Println(msg.Address)
+		client.Send(msg)
+	})
+
+	log.Println("Creating /pulse endpoint")
+	http.HandleFunc("/pulse", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "OK")
+
+		sensorID := r.URL.Query()["id"][0]
+		bpm, err := strconv.ParseFloat(r.URL.Query()["bpm"][0], 32)
 		if err != nil {
-			log.Println("Missing s variable")
+			log.Println("Missing bpm variable")
+		}
+
+		if strings.Compare(sensorID, "A") == 0 {
+			heartRateA <- int(bpm)
+		} else {
+			heartRateB <- int(bpm)
 		}
 
 		client := osc.NewClient("localhost", 53000)
-		msg := osc.NewMessage(fmt.Sprintf("/cue/step%s/start", sensorID))
-		client.Send(msg)
+		msg := osc.NewMessage(fmt.Sprintf("/cue/bpm%s%d/start", sensorID, int(bpm)))
 
-		log.Println(fmt.Sprintf("%s(%d)->/cue/step%s/start", sensorID, steps, sensorID))
+		log.Println(msg.Address)
+		client.Send(msg)
 	})
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
