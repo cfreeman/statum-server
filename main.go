@@ -90,7 +90,7 @@ func main() {
 		}
 
 		client := osc.NewClient("localhost", 53000)
-		msg := osc.NewMessage(fmt.Sprintf("/cue/g%s%d/start", sensorID, int(acc)))
+		msg := osc.NewMessage(fmt.Sprintf("/cue/g%s%03d/start", sensorID, int(acc)))
 		log.Println(msg.Address)
 		client.Send(msg)
 
@@ -99,7 +99,7 @@ func main() {
 			log.Println("Missing rm variable")
 		}
 
-		msg = osc.NewMessage(fmt.Sprintf("/cue/r%s%d/start", sensorID, int(rot)))
+		msg = osc.NewMessage(fmt.Sprintf("/cue/r%s%03d/start", sensorID, int(rot)))
 		log.Println(msg.Address)
 		client.Send(msg)
 	})
@@ -113,7 +113,7 @@ func main() {
 
 		mutex.Lock()
 		steps[sensorID] = steps[sensorID] + 1
-		msg := osc.NewMessage(fmt.Sprintf("/cue/s%s%d/start", sensorID, steps[sensorID]))
+		msg := osc.NewMessage(fmt.Sprintf("/cue/s%s%03d/start", sensorID, steps[sensorID]))
 		mutex.Unlock()
 
 		log.Println(msg.Address)
@@ -141,7 +141,7 @@ func main() {
 		}
 
 		client := osc.NewClient("localhost", 53000)
-		msg := osc.NewMessage(fmt.Sprintf("/cue/bpm%s%d/start", sensorID, int(bpm)))
+		msg := osc.NewMessage(fmt.Sprintf("/cue/bpm%s%03d/start", sensorID, int(bpm)))
 
 		log.Println(msg.Address)
 		client.Send(msg)
